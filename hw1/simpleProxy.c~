@@ -13,14 +13,17 @@ int main(int argc, char **argv){
   int sock1;
   int sock2;
   int mysock1;
+  //int mysock2;
   struct sockaddr_in server;
   struct sockaddr_in proxy;
+  //struct sockaddr_in response;
   struct hostent *host;
   char *hostname;
   char buf[1024];
   size_t buflen;
   char reqbuf[1024];
   int rval;
+  //socklen_t len;
   ParsedRequest *parse = (ParsedRequest*)malloc(sizeof(ParsedRequest));
 
   /* create socket1 for client */
@@ -39,6 +42,9 @@ int main(int argc, char **argv){
   proxy.sin_family = AF_INET;
   proxy.sin_addr.s_addr = INADDR_ANY;
   proxy.sin_port = htons(5000);
+  //response.sin_family = AF_INET;
+  //response.sin_addr.s_addr = INADDR_ANY;
+  //response.sin_port = htons(5001);
   server.sin_family = AF_INET;
 
   /* call blind */
@@ -46,7 +52,11 @@ int main(int argc, char **argv){
     perror("bind failed");
     exit(1);
   }
-  
+
+  //if(bind(sock2, (struct sockaddr*)&response, sizeof(response))){
+  //  perror("bind failed");
+  //  exit(1);
+  //}
   /* listen */
   listen(sock1, 5);
 
@@ -91,18 +101,27 @@ int main(int argc, char **argv){
 	exit(1);
       }
       printf("Send %s\n", reqbuf);
-      /* recv response */ 
-      memset(buf, 0, sizeof(buf));
-      if((rval = recv(sock2, buf, sizeof(buf), 0)) < 0){
-	perror("reading stream message error");
-      }else if(rval == 0){
-	perror("Ending connection\n");
-      }else{
-	printf("MSG: %s\n", buf);
-      }
-      printf("Got the message (rval = %d)\n", rval);     
+      /* .................................... */
+      /* listen */ 
+      //listen(sock2, 5);
+      //len = sizeof(server);
+      // mysock2 = accept(sock2, (struct sockaddr*)&server, &len);
+      // if(mysock2 == -1){
+      //perror("accept failed");
+      //}else{
+	memset(buf, 0, sizeof(buf));
+	if((rval = recv(sock2, buf, sizeof(buf), 0)) < 0){
+	  perror("reading stream message error");
+	}else if(rval == 0){
+	  perror("Ending connection\n");
+	}else{
+	  printf("MSG: %s\n", buf);
+	}
+	printf("Got the message (rval = %d)\n", rval);
+	//}     
       
       close(mysock1);
+      //close(mysock2);
     }
   }while(1);
   
