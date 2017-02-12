@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <sys/types.h>                                                                    
 #include <sys/socket.h>                                                                   
-#include <netinet/in.h>                                                                   
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>                                                                     
 #include <string.h>                                                                       
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 #include "parseReqResp.h"
 
@@ -17,10 +19,11 @@ int main(int argc, char **argv){
   struct sockaddr_in proxy;
   struct hostent *host;
   char *hostname;
-  char buf[1024];
+  char buf[4096];
   size_t buflen;
   char reqbuf[1024];
   int rval;
+  time_t recv_time;
   ParsedRequest *parse = (ParsedRequest*)malloc(sizeof(ParsedRequest));
 
   /* create socket1 for client */
@@ -40,7 +43,6 @@ int main(int argc, char **argv){
   proxy.sin_addr.s_addr = INADDR_ANY;
   proxy.sin_port = htons(5000);
   server.sin_family = AF_INET;
-
   /* call blind */
   if(bind(sock1, (struct sockaddr*)&proxy, sizeof(proxy))){
     perror("bind failed");
@@ -66,6 +68,9 @@ int main(int argc, char **argv){
       }
       printf("Got the message (rval = %d)\n", rval);
 
+      time(&recv_time);
+      printf("Current local time and date: %s", asctime(localtime(&recv_time)));
+      //printf("%s\n", inet_ntoa(proxy.sin_addr));
       buflen = strlen(buf);
       ParseRequest(parse, buf, buflen);
       /* get hostname */

@@ -11,6 +11,7 @@ struct ParsedRequest_t{
   char *port;
   char *path;
   char *version;
+  char *protocol;
   char *buf;
   size_t buflen;
 };
@@ -48,23 +49,43 @@ int ParseRequest(ParsedRequest *parse, const char *buf, size_t buflen){
     free(parse->buf);
     exit(1);
   }
-  /* parse the path */
-  parse->path = strtok(NULL, " ");
-  if(parse->path == NULL){
-    perror("Parse error, incorrect request line");
+  /* parse the version of HTTP */
+  char *full_addr = strtok(NULL, " ");
+  parse->version = full_addr + strlen(full_addr) + 1;
+  /* parse protocol */
+  parse->protocol = strtok(full_addr, "://");
+  if(parse->protocol == NULL){
+    perror("Parse error, incorrect protocol");
     free(tmp_buf);
     free(parse->buf);
     exit(1);
   }
-  /* parse the version of HTTP */
-  parse->version = strtok(NULL, " ");
-  if(parse->version == NULL){
-    perror("Parse error, incorrect request line");
+  /* parse host and path */
+  parse->host = strtok(NULL, "/");
+  if(parse->host == NULL){
+    perror("Parse error, incorrect host");
     free(tmp_buf);
     free(parse->buf);
     exit(1);
   }
   
+  parse->path = strtok(NULL, " ");
+  //printf("%s\n", parse->path);
+  if(parse->path == NULL){
+    size_t rlen = strlen("/");
+    parse->path = (char*)malloc(rlen + 1);
+    memcpy(parse->path, "/", rlen);
+    parse->path[rlen] = '\0'; 
+  }else{
+    size_t rlen = strlen("/");
+    size_t plen = strlen(parse->path);
+    char *tmp = parse->path;
+    parse->path = (char*)malloc(rlen + plen + 1);
+    memcpy(parse->path, "/", rlen);
+    memcpy(parse->path + rlen, tmp, plen);
+    parse->path[rlen + plen] = '\0';
+  }  
+ 
   char *currentHeader = strstr(tmp_buf, "\r\n") + 2;
   index = strstr(currentHeader, "\r\n");
   parse->buf = (char *)malloc(index - currentHeader + 1);
@@ -72,14 +93,8 @@ int ParseRequest(ParsedRequest *parse, const char *buf, size_t buflen){
   memcpy(parse->buf, currentHeader, index - currentHeader);
   parse->buf[index - currentHeader] = '\0';
   /* parse host and port */
-  parse->host = strtok(parse->buf, ":");
-  parse->host = strtok(NULL, ":");
-  if(parse->host == NULL){
-    perror("Parse error, incorrect header file");
-    free(tmp_buf);
-    free(parse->buf);
-    exit(1);
-  }
+  parse->port = strtok(parse->buf, ":");
+  parse->port = strtok(NULL, ":");
   parse->port = strtok(NULL, ":");
   if(parse->port == NULL){
     parse->port = "80";
