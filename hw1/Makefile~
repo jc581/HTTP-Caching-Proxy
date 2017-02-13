@@ -1,0 +1,2 @@
+Proxy: Proxy.cpp parseReqResp.h
+	g++ -Wall -g Proxy.cpp -o Proxy --std=g++11

@@ -59,7 +59,7 @@ int ParseRequest(ParsedRequest *parse, const char *buf, size_t buflen){
     parse->host = strtok(full_addr, " ");
   }
   if(parse->port == NULL){
-    parse->port = "80";
+    //parse->port = "80";
   }
   char *tmp_host = strtok(parse->host, "/");
   if(tmp_host == NULL){
