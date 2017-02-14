@@ -8,12 +8,15 @@
 #include <time.h>
 #include <unistd.h>
 #include "parseReqResp.h"
+#include "unordered_map.h"
 
 #define PROXYPORT 5060 //proxy listen port
 #define BUFSIZE 10240
 #define true 1
 #define false 0
 
+pthread_mutex_t mutex;
+pthread_cond_t cond;
 int CLIENT_SOCK;
 
 //using namespace std;
@@ -38,7 +41,6 @@ int ProxytoServerAfter(ProxyParam *proxyP){
   int buflen;
   int rval;
 
-  //memcpy(buf, proxyP->buf, BUFSIZE);
   /* send request to server */
   /* ID: Requesting "REQUEST from SERVER */
   while(!proxyP->pPair->IsUser_proxyClosed && !proxyP->pPair->IsProxy_serverClosed){
@@ -55,13 +57,12 @@ int ProxytoServerAfter(ProxyParam *proxyP){
 
     if(rval == 0){
       perror("Ending connection\n");
+      close(proxyP->pPair->proxy_server);
       proxyP->pPair->IsProxy_serverClosed = true;
-      break;
+      //break;
     }
 
     buflen = rval;
-    // debug
-    printf("MSG received: %s\n", buf);
 
     /* send response back */
     if((rval = send(proxyP->pPair->user_proxy, buf, buflen, 0)) < 0){
@@ -82,20 +83,15 @@ int ProxytoServerAfter(ProxyParam *proxyP){
   }
 
 
-  return 0;
+  return rval;
 }
 
-int ProxytoServer(ProxyParam *proxyP){
-  //char buf[BUFSIZE];
-  //char recvbuf[65535];
-  //int buflen = proxyP->buflen;
+void* ProxytoServer(void *ProxyP){
   struct sockaddr_in server;
   struct hostent *hp;
   int server_sock;
-  //int rval;
-
-  //memcpy(buf, proxyP->buf, BUFSIZE);
-
+  ProxyParam *proxyP = (ProxyParam*)ProxyP;
+  
   hp = gethostbyname(proxyP->host);
   if(hp == 0){
     perror("gethostbyname failed");
@@ -112,6 +108,7 @@ int ProxytoServer(ProxyParam *proxyP){
     proxyP->pPair->IsProxy_serverClosed = true;
     exit(1);
   }
+  pthread_mutex_lock(&mutex);
   if(connect(server_sock, (struct sockaddr*)&server, sizeof(server)) < 0){
     perror("connect failed");
     proxyP->pPair->IsProxy_serverClosed = true;
@@ -122,12 +119,15 @@ int ProxytoServer(ProxyParam *proxyP){
   proxyP->pPair->proxy_server = server_sock;
   proxyP->pPair->IsProxy_serverClosed = false;
 
+  pthread_cond_signal(&cond);
+  pthread_mutex_unlock(&mutex);
+
   ProxytoServerAfter(proxyP);
 
-  return 0;
+  return NULL;
 }
 
-int UsertoProxy(void *pParam){
+void* UsertoProxy(void *pParam){
   char buf[BUFSIZE];
   int buflen;
   struct sockaddr_in client;
@@ -148,7 +148,7 @@ int UsertoProxy(void *pParam){
 
   /* start another thread to listen */
   pthread_create(&listen_thread, NULL, UsertoProxy, pParam);
-	      
+
   sPair.IsUser_proxyClosed = false;
   sPair.IsProxy_serverClosed = true;
   sPair.user_proxy = msg_socket;
@@ -167,28 +167,32 @@ int UsertoProxy(void *pParam){
       sPair.IsUser_proxyClosed = true;
     }
   }
-  // debug
-  printf("MSG: %s\n", buf);
-  // debug
+  //printf("%zu\n", strlen(buf));
+  //printf("req MSG %s, %d\n", buf, rval);
+ 
   proxyP.pPair = &sPair;
   buflen = rval;
   ParseRequest(parse_req, buf, buflen);
   proxyP.host = parse_req->host;
   proxyP.port = parse_req->port;
-  
+
   /* start send thread */
   pthread_create(&send_thread, NULL, ProxytoServer, &proxyP);
+  pthread_mutex_lock(&mutex);
+  while(sPair.IsProxy_serverClosed){
+    pthread_cond_wait(&cond, &mutex); //wait for the condition
+  }
+  pthread_mutex_unlock(&mutex);
   
   while(sPair.IsUser_proxyClosed == false && sPair.IsProxy_serverClosed == false){
-    //while(1){
-    if((rval = send(sPair->proxy_server, buf, buflen, 0)) < 0){
+    if((rval = send(sPair.proxy_server, buf, buflen, 0)) < 0){
       perror("send failed");
-      if(sPair->IsProxy_serverClosed == false){
-	close(sPair->proxy_server);
-	sPair->IsProxy_serverClosed = true;
+      if(sPair.IsProxy_serverClosed == false){
+	close(sPair.proxy_server);
+	sPair.IsProxy_serverClosed = true;
       }
       continue;
-    }    
+    }
     
     if((rval = recv(sPair.user_proxy, buf, sizeof(buf), 0)) < 0){
       perror("reading stream message error");
@@ -204,19 +208,21 @@ int UsertoProxy(void *pParam){
 	sPair.IsUser_proxyClosed = true;
       }
       break;
-    }
+    }   
   }
-  
-  if(sPair->IsUser_proxyClosed == false){
-    close(sPair->user_proxy);
-    sPair->IsUser_proxyClosed = true;
+
+  if(sPair.IsUser_proxyClosed == false){
+    close(sPair.user_proxy);
+    sPair.IsUser_proxyClosed = true;
   }
-  if(sPair->IsProxy_serverClosed == false){
-    close(sPair->proxy_server);
-    sPair->IsProxy_serverClosed = true;
+  if(sPair.IsProxy_serverClosed == false){
+    close(sPair.proxy_server);
+    sPair.IsProxy_serverClosed = true;
   }
-  
-  return 0;
+  pthread_join(listen_thread, NULL);
+  pthread_join(send_thread, NULL);
+
+  return NULL;
 }
 
 int Proxy_Init(){
@@ -261,6 +267,3 @@ int main(int argc, char **argv){
 
   return 0;
 }
-
-
-  

@@ -40,7 +40,6 @@ int ProxytoServerAfter(ProxyParam *proxyP){
   int buflen;
   int rval;
 
-  //memcpy(buf, proxyP->buf, BUFSIZE);
   /* send request to server */
   /* ID: Requesting "REQUEST from SERVER */
   while(!proxyP->pPair->IsUser_proxyClosed && !proxyP->pPair->IsProxy_serverClosed){
@@ -63,8 +62,6 @@ int ProxytoServerAfter(ProxyParam *proxyP){
     }
 
     buflen = rval;
-    // debug
-    printf("MSG received: %s\n", buf);
 
     /* send response back */
     if((rval = send(proxyP->pPair->user_proxy, buf, buflen, 0)) < 0){
@@ -92,7 +89,7 @@ void* ProxytoServer(void *ProxyP){
   struct sockaddr_in server;
   struct hostent *hp;
   int server_sock;
-  int rval;
+  //int rval;
   ProxyParam *proxyP = (ProxyParam*)ProxyP;
   
   hp = gethostbyname(proxyP->host);
@@ -125,7 +122,7 @@ void* ProxytoServer(void *ProxyP){
   pthread_cond_signal(&cond);
   pthread_mutex_unlock(&mutex);
 
-  rval = ProxytoServerAfter(proxyP);
+  ProxytoServerAfter(proxyP);
 
   return NULL;
 }
@@ -170,9 +167,9 @@ void* UsertoProxy(void *pParam){
       sPair.IsUser_proxyClosed = true;
     }
   }
-  // debug
-  //printf("MSG: %s\n", buf);
-  // debug
+  printf("%zu\n", strlen(buf));
+  printf("req MSG %s, %d\n", buf, rval);
+ 
   proxyP.pPair = &sPair;
   buflen = rval;
   ParseRequest(parse_req, buf, buflen);
@@ -182,16 +179,11 @@ void* UsertoProxy(void *pParam){
   /* start send thread */
   pthread_create(&send_thread, NULL, ProxytoServer, &proxyP);
   pthread_mutex_lock(&mutex);
-  while(!cond){
+  while(sPair.IsProxy_serverClosed){
     pthread_cond_wait(&cond, &mutex); //wait for the condition
   }
   pthread_mutex_unlock(&mutex);
   
-  if(sPair.IsProxy_serverClosed == false){
-    printf("0\n");
-  }else{
-    printf("1\n");
-  }
   while(sPair.IsUser_proxyClosed == false && sPair.IsProxy_serverClosed == false){
     if((rval = send(sPair.proxy_server, buf, buflen, 0)) < 0){
       perror("send failed");
@@ -201,7 +193,7 @@ void* UsertoProxy(void *pParam){
       }
       continue;
     }
-    printf("MSG send:%s\n", buf); 
+    //printf("MSG send:%s\n", buf); 
     
     if((rval = recv(sPair.user_proxy, buf, sizeof(buf), 0)) < 0){
       perror("reading stream message error");
