@@ -25,7 +25,6 @@ int ParseRequest(ParsedRequest *parse, const char *buf, size_t buflen){
   /* copy the buffer string into temp buffer */ 
   memcpy(tmp_buf, buf, buflen);
   tmp_buf[buflen] = '\0';
- 
   if(!(index = strstr(tmp_buf, "\r\n\r\n"))){
     perror("Parse error, no end in header");
     exit(1);
@@ -53,21 +52,24 @@ int ParseRequest(ParsedRequest *parse, const char *buf, size_t buflen){
     parse->host = strtok(NULL, " ");
     parse->host += 2;
     parse->host = strtok(parse->host, ":");
-  }else{   
-  /* parse host and path */
     parse->port = strtok(NULL, ":");
-    parse->host = strtok(full_addr, " ");
+  }else{   
+    /* parse host and path */
+    parse->protocol = NULL;
+    parse->port = strtok(NULL, ":");
+    parse->host = strtok(full_addr, ":");
   }
   if(parse->port == NULL){
-    //parse->port = "80";
+    parse->port = "80";
   }
   char *tmp_host = strtok(parse->host, "/");
   if(tmp_host == NULL){
-    parse->host = strtok(parse->host, ":");
+    //parse->host = strtok(parse->host, ":");
   }
   else{
-    parse->path = strtok(NULL, "/");
+    parse->path = strtok(NULL, ":");
   }
+
   if(parse->path == NULL){
     size_t rlen = strlen("/");
     parse->path = (char*)malloc(rlen + 1);

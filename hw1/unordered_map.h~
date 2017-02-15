@@ -68,6 +68,7 @@ class Cache{
     /* update base map and frequency map */
     b_map[key].first = value;
     b_map[key].second = 1;
+    cout << b_map[key].second << endl;
     f_map[1].push_back(key);
     mIter[key] = --f_map[1].end();
     minFreq = 1;
