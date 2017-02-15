@@ -1,2 +1,7 @@
-Proxy: Proxy.cpp parseReqResp.h
-	g++ -Wall -g Proxy.cpp -o Proxy --std=gnu++11
+all: parseTest
+
+parseTest: test.cpp parseRes.cpp 
+	g++ -o test test.cpp -Werror -Wall -pedantic -ggdb3 --std=gnu++11
+
+clean:
+	rm *.~ *~ *# test
